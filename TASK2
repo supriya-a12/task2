@@ -1,0 +1,97 @@
+import pandas as pd
+import numpy as np
+from datetime import time
+
+# Question 1: Distance Matrix Calculation
+def calculate_distance_matrix(data):
+    # Create a pivot table with cumulative distances along known routes
+    distance_matrix = pd.pivot_table(data, values='distance', index='id_start', columns='id_end', fill_value=0)
+    
+    # Make the matrix symmetric (account for bidirectional distances)
+    distance_matrix = distance_matrix + distance_matrix.T - np.diag(distance_matrix.diagonal())
+    
+    return distance_matrix
+
+# Question 2: Unroll Distance Matrix
+def unroll_distance_matrix(distance_matrix):
+    # Unstack the DataFrame to create id_start, id_end, and distance columns
+    unrolled_matrix = distance_matrix.unstack().reset_index(name='distance')
+    
+    # Exclude rows where id_start is equal to id_end
+    unrolled_matrix = unrolled_matrix[unrolled_matrix['id_start'] != unrolled_matrix['id_end']]
+    
+    return unrolled_matrix
+
+# Question 3: Finding IDs within Percentage Threshold
+def find_ids_within_ten_percentage_threshold(unrolled_matrix, reference_value):
+    # Calculate average distance for the reference value
+    reference_average = unrolled_matrix[unrolled_matrix['id_start'] == reference_value]['distance'].mean()
+    
+    # Find values within 10% threshold
+    threshold_min = reference_average * 0.9
+    threshold_max = reference_average * 1.1
+    
+    # Get sorted list of values from id_start column within the threshold
+    within_threshold = unrolled_matrix[(unrolled_matrix['distance'] >= threshold_min) & (unrolled_matrix['distance'] <= threshold_max)]['id_start'].unique()
+    within_threshold.sort()
+    
+    return within_threshold
+
+# Question 4: Calculate Toll Rate
+def calculate_toll_rate(unrolled_matrix):
+    # Add columns for moto, car, rv, bus, and truck with their respective rate coefficients
+    unrolled_matrix['moto'] = unrolled_matrix['distance'] * 0.8
+    unrolled_matrix['car'] = unrolled_matrix['distance'] * 1.2
+    unrolled_matrix['rv'] = unrolled_matrix['distance'] * 1.5
+    unrolled_matrix['bus'] = unrolled_matrix['distance'] * 2.2
+    unrolled_matrix['truck'] = unrolled_matrix['distance'] * 3.6
+    
+    return unrolled_matrix
+
+# Question 5: Calculate Time-Based Toll Rates
+def calculate_time_based_toll_rates(unrolled_matrix):
+    # Define time ranges and discount factors
+    time_ranges = [(time(0, 0, 0), time(10, 0, 0), 0.8),
+                   (time(10, 0, 1), time(18, 0, 0), 1.2),
+                   (time(18, 0, 1), time(23, 59, 59), 0.8)]
+    
+    # Apply discount factors based on time ranges
+    for start_time, end_time, discount_factor in time_ranges:
+        mask = (unrolled_matrix['start_time'] >= start_time) & (unrolled_matrix['end_time'] <= end_time)
+        unrolled_matrix.loc[mask, ['moto', 'car', 'rv', 'bus', 'truck']] *= discount_factor
+    
+    # Apply constant discount factor for weekends
+    weekend_mask = (unrolled_matrix['start_day'].isin(['Saturday', 'Sunday']))
+    unrolled_matrix.loc[weekend_mask, ['moto', 'car', 'rv', 'bus', 'truck']] *= 0.7
+    
+    return unrolled_matrix
+
+# Example usage:
+# Load the dataset
+dataset3 = pd.read_csv('dataset-3.csv')
+
+# Task 2 Question 1
+result1 = calculate_distance_matrix(dataset3)
+print("Task 2 Question 1 Result:")
+print(result1)
+
+# Task 2 Question 2
+result2 = unroll_distance_matrix(result1)
+print("\nTask 2 Question 2 Result:")
+print(result2)
+
+# Task 2 Question 3
+reference_value = 1  # Replace with the desired reference value
+result3 = find_ids_within_ten_percentage_threshold(result2, reference_value)
+print("\nTask 2 Question 3 Result:")
+print(result3)
+
+# Task 2 Question 4
+result4 = calculate_toll_rate(result2)
+print("\nTask 2 Question 4 Result:")
+print(result4)
+
+# Task 2 Question 5
+result5 = calculate_time_based_toll_rates(result2)
+print("\nTask 2 Question 5 Result:")
+print(result5)
